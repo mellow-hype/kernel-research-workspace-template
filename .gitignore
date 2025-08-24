@@ -1,0 +1,7 @@
+# Always ignore these file types
+*.id_rsa
+*.pub
+*.img
+*.ext4
+*.orig
+*.qcow2

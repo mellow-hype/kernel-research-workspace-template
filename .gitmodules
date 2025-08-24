@@ -1,0 +1,3 @@
+[submodule "kutils"]
+	path = kutils
+	url = git@github.com:mellow-hype/kernel-utils.git
