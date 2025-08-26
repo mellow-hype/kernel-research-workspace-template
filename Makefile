@@ -7,6 +7,7 @@ KUTILS_KERNEL_DL := $(KUTILS)/build-utils/kerneldl.sh
 KUTILS_CONFIG_BASELINE := $(KUTILS)/config/config-x86-baseline.sh
 KUTILS_CONFIG_DEBUG := $(KUTILS)/config/config-debugflags.sh
 KUTILS_CONFIG_KCOV := $(KUTILS)/config/config-kcov.sh
+KUTILS_CONFIG_FUZZING := $(KUTILS)/config/config-fuzzing.sh
 LINUX_ARCHIVE=linux-$(version).tar.gz
 VIRT_DIR ?= ./virt
 TIMESTAMP := $(shell date +%Y%m%d-%H%M%S)
@@ -104,11 +105,13 @@ help:
 	$(info config_baseline ksrc=path/to/kernel | Apply baseline config flags to ksrc/.config)
 	$(info config_debug ksrc=path/to/kernel | Apply debug config flags to ksrc/.config)
 	$(info config_kcov ksrc=path/to/kernel | Apply kcov config flags to ksrc/.config)
+	$(info config_fuzzing ksrc=path/to/kernel | Apply fuzzing config flags to ksrc/.config)
 	$(info -----------------)
 	$(info compile ksrc=path/to/kernel | Compile kernel at ksrc)
 	$(info build_default ksrc=path/to/kernel | Full clean, config, and build of kernel at ksrc)
 	$(info build_default_debug ksrc=path/to/kernel | Full clean, config + debug, and build of kernel at ksrc)
 	$(info build_default_kcov ksrc=path/to/kernel | Full clean, config + kcov, and build of kernel at ksrc)
+	$(info build_default_fuzzing ksrc=path/to/kernel | Full clean, config + fuzzing, and build of kernel at ksrc)
 	$(info -----------------)
 	$(info ksrc_full_clean ksrc=path/to/kernel | Run 'make mrproper' and 'make distclean' in ksrc)
 	$(info ksrc_clone ksrc=path/to/kernel tag=tag odir=output/dir | Clone kernel source at ksrc to odir/kernel-src-tag)
@@ -167,9 +170,13 @@ config_debug: ksrc_check
 	$(info Applying debug flags to config at $(ksrc)/.config)
 	$(KUTILS_CONFIG_DEBUG) $(ksrc)
 
-config_kcov: ksrc_check
+config_kcov: ksrc_check config_debug
 	$(info Applying kcov flags to config at $(ksrc)/.config)
 	$(KUTILS_CONFIG_KCOV) $(ksrc)
+
+config_fuzzing: ksrc_check config_kcov
+	$(info Applying fuzzing flags to config at $(ksrc)/.config)
+	$(KUTILS_CONFIG_FUZZING) $(ksrc)
 
 # Build targets
 compile: ksrc_check
@@ -183,7 +190,10 @@ build_default_debug: ksrc_full_clean config_x86 config_baseline config_debug com
 	$(info Full default +debug x86_x64 build complete)
 
 build_default_kcov: ksrc_full_clean config_x86 config_baseline config_kcov compile
-	$(info Full default +kcov x86_x64 build complete)
+	$(info Full default +kcov+debug x86_x64 build complete)
+
+build_default_fuzzing: ksrc_full_clean config_x86 config_baseline config_fuzzing compile
+	$(info Full default +fuzzing+kcov+debug x86_x64 build complete)
 
 # Export targets
 export_kernel_x86: ksrc_check
@@ -192,6 +202,15 @@ export_kernel_x86: ksrc_check
 	make -C $(ksrc) savedefconfig
 	cp -r $(ksrc)/defconfig $(VIRT_EXPORT_DIR_X86)/defconfig-$(TIMESTAMP)
 	cp $(ksrc)/arch/x86/boot/bzImage $(VIRT_EXPORT_DIR_X86)/bzImage-$(TIMESTAMP)
+	cp $(ksrc)/vmlinux $(VIRT_EXPORT_DIR_X86)/vmlinux-$(TIMESTAMP)
+
+export_kernel_tagged: ksrc_check build_tag_check
+	$(info Exporting kernel image from $(ksrc) with tag $(tag))
+	mkdir -p $(VIRT_EXPORT_DIR_X86)
+	make -C $(ksrc) savedefconfig
+	cp -r $(ksrc)/defconfig $(VIRT_EXPORT_DIR_X86)/defconfig-$(tag)
+	cp $(ksrc)/arch/x86/boot/bzImage $(VIRT_EXPORT_DIR_X86)/bzImage-$(tag)
+	cp $(ksrc)/vmlinux $(VIRT_EXPORT_DIR_X86)/vmlinux-$(tag)
 
 # Dev environment targets
 init_docker_dev_env:
